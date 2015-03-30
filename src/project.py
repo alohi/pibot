@@ -71,7 +71,8 @@ def sendSms(num, msg):
 	port.write("AT+CMGS=\"" + num + "\"\r\n")
 	time.sleep(0.5)
 	port.write(msg + "\r\n")
-	port.write(0x1A)
+	sub = "1A"
+	port.write(sub.decode("hex"))
 	time.sleep(0.5)
 
 def readGpsAndSendSms():
