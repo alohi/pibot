@@ -16,12 +16,22 @@ OBST_SENSOR = 18
 # Delay for turing in seconds
 TURN_DELAY = 3
 
+# Flags
+fire_sen_flag = 0
+obst_sen_flag = 0
+
+# Num and msg
+num = "9342833087"
+fireAlert = "fire detected"
+
 def setupGPIO():
 	GPIO.setmode(GPIO.BCM)
 	GPIO.setup(MOTOR_A_1, GPIO.OUT)
 	GPIO.setup(MOTOR_A_2, GPIO.OUT)
 	GPIO.setup(MOTOR_B_1, GPIO.OUT)
 	GPIO.setup(MOTOR_B_2, GPIO.OUT)
+	GPIO.setup(FIRE_SENSOR, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+	GPIO.setup(OBST_SENSOR, GPIO.IN, pull_up_down = GPIO.PUD_UP)
 
 def motorFw():
 	print "Motor Forward"
@@ -79,10 +89,24 @@ def readGpsAndSendSms():
 	print "Reading from GPS"
 	rcv = port.read(10)
 
+def readObstSen():
+	if GPIO.input(OBST_SENSOR) == 1:
+		time.sleep(0.01)
+		return 1
+	else:
+		return 0
+
+def readFireSen():
+	if GPIO.input(FIRE_SENSOR) == 1:
+		time.sleep(0.01)
+		return 1
+	else:
+		return 0
+
 print "Started"
 setupGPIO()
 port = serial.Serial("/dev/ttyAMA0", baudrate = 115200, timeout = 3.0)
-sendSms("9342833087", "Hai")
+
 
 while True:
 	motorFw()
@@ -95,3 +119,23 @@ while True:
 	time.sleep(5)
 	motorLeft()
 	time.sleep(5)
+
+	fire_val = readFireSen()
+	obst_val = readObstSen()
+
+	# Fire sensor part
+	if fire_val == 1:
+		print "Fire detected"
+		if fire_sen_flag == 0:
+			print "flag is 0"
+			fire_sen_flag = 1
+			motorStop()
+			sendSms(num, fireAlert)
+
+	else:
+		fire_sen_flag = 0
+
+	# Obstacle part
+	if obst_val == 1:
+		print "Obstacle detected"
+
