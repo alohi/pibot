@@ -2,6 +2,8 @@
 import RPi.GPIO as GPIO
 import time
 import serial
+import io
+import pynmea2
 
 # Motor Pins
 MOTOR_A_1 = 7
@@ -23,6 +25,9 @@ obst_sen_flag = 0
 # Num and msg
 num = "9342833087"
 fireAlert = "fire detected"
+
+gps = ""
+gpsRead = False
 
 def setupGPIO():
 	GPIO.setmode(GPIO.BCM)
@@ -85,43 +90,62 @@ def sendSms(num, msg):
 	port.write(sub.decode("hex"))
 	time.sleep(0.5)
 
-def readGpsAndSendSms():
-	print "Reading from GPS"
-	rcv = port.read(10)
+def readGps():
+	msg = ""
+	try:
+		#rcv = port.read(30)
+		#port.flushInput()
+		#print rcv
+		#time.sleep(0.2)
+		rcv = port.readline()
+		print rcv
+		msg = rcv.split(',')
+		print msg
+		port.flushInput()
+		if msg[0] == "$GPGGA":
+			try:
+				gps = pynmea2.parse(rcv)
+				gpsRead = True
+				print "Time " + str(gps.timestamp)
+				print "Lat " + gps.lat		
+			except pynmea2.ParseError:
+				print "Parse error"	
+	except serial.SerialException:
+		print "Serial error"
+		#port.flushInput()
 
 def readObstSen():
-	if GPIO.input(OBST_SENSOR) == 1:
-		time.sleep(0.01)
+	if GPIO.input(OBST_SENSOR) == 0:
+		time.sleep(0.3)
 		return 1
 	else:
 		return 0
 
 def readFireSen():
-	if GPIO.input(FIRE_SENSOR) == 1:
-		time.sleep(0.01)
+	if GPIO.input(FIRE_SENSOR) == 0:
+		time.sleep(0.3)
 		return 1
 	else:
 		return 0
 
 print "Started"
 setupGPIO()
-port = serial.Serial("/dev/ttyAMA0", baudrate = 115200, timeout = 3.0)
-
+port = serial.Serial("/dev/ttyAMA0", baudrate = 9600, timeout = 3.0)
 
 while True:
-	motorFw()
-	time.sleep(5)
-	motorBw()
-	time.sleep(5)
-	motorStop()
-	time.sleep(5)
-	motorRight()
-	time.sleep(5)
-	motorLeft()
-	time.sleep(5)
-
+	#motorFw()
+	#time.sleep(5)
+	#motorBw()
+	#time.sleep(5)
+	#motorStop()
+	#time.sleep(5)
+	#motorRight()
+	#time.sleep(5)
+	#motorLeft()
+	#time.sleep(5)
 	fire_val = readFireSen()
 	obst_val = readObstSen()
+	#readGps()
 
 	# Fire sensor part
 	if fire_val == 1:
@@ -137,5 +161,8 @@ while True:
 
 	# Obstacle part
 	if obst_val == 1:
-		print "Obstacle detected"
-
+		print "Obstacle"
+		readGps()
+		if gpsRead == True:
+			print gps.timestamp
+	#time.sleep(2)
