@@ -27,7 +27,7 @@ num = "9342833087"
 fireAlert = "fire detected"
 
 gps = ""
-gpsRead = False
+gpsReadFlag = False
 
 def setupGPIO():
 	GPIO.setmode(GPIO.BCM)
@@ -93,26 +93,24 @@ def sendSms(num, msg):
 def readGps():
 	msg = ""
 	try:
-		#rcv = port.read(30)
-		#port.flushInput()
-		#print rcv
-		#time.sleep(0.2)
 		rcv = port.readline()
-		print rcv
+		#print rcv
 		msg = rcv.split(',')
-		print msg
-		port.flushInput()
+		#print msg
+		#port.flushInput()
 		if msg[0] == "$GPGGA":
 			try:
+				global gps
 				gps = pynmea2.parse(rcv)
-				gpsRead = True
+				global gpsReadFlag
+				gpsReadFlag = True
+				print str(gpsReadFlag)
 				print "Time " + str(gps.timestamp)
 				print "Lat " + gps.lat		
 			except pynmea2.ParseError:
 				print "Parse error"	
 	except serial.SerialException:
 		print "Serial error"
-		#port.flushInput()
 
 def readObstSen():
 	if GPIO.input(OBST_SENSOR) == 0:
@@ -128,9 +126,14 @@ def readFireSen():
 	else:
 		return 0
 
+motorFlag = False
+
 print "Started"
 setupGPIO()
-port = serial.Serial("/dev/ttyAMA0", baudrate = 9600, timeout = 3.0)
+port = serial.Serial("/dev/ttyUSB0", baudrate = 9600, timeout = 3.0)
+
+gpsReadFlag = False
+motorFw()
 
 while True:
 	#motorFw()
@@ -146,23 +149,41 @@ while True:
 	fire_val = readFireSen()
 	obst_val = readObstSen()
 	#readGps()
+	#readGps()
 
 	# Fire sensor part
 	if fire_val == 1:
 		print "Fire detected"
+		print str(gpsReadFlag)
 		if fire_sen_flag == 0:
 			print "flag is 0"
 			fire_sen_flag = 1
 			motorStop()
-			sendSms(num, fireAlert)
+			print str(gpsReadFlag)
+			if gpsReadFlag == True:
+				gpsReadFlag = False
+				print "GPS Data found"
+				#sms = "Fire detected at \n" + "Lat: " + str(gps.lat) + "\n" + "Lon: " + str(gps.lon) + "\n" + "LatDir: " + str(gps.lat_dir) + "\n" + "LonDir: " + str(gps.lon_dir) + "\n" + "qua: " + str(gps.gps_qual) + "\n" + "Sat: " + str(gps.num_sats) + "\n" + "Alt: " + str(gps.altitude) + "\n" +  
+				sms = str(gps.timestamp) + ": " + str(gps.latitude)  + str(gps.latitude_minutes) + str(gps.latitude_seconds)
+				print sms
+				sendSms(num, fireAlert)
+			else:
+				print "GPS Data Not Found"
 
 	else:
-		fire_sen_flag = 0
+		if fire_sen_flag == 1:
+			motorFw()
+			fire_sen_flag = 0
 
 	# Obstacle part
 	if obst_val == 1:
 		print "Obstacle"
+		print str(gpsReadFlag)
+		if motorFlag == True:
+			motorLeft()
+			motorFlag = False
+		else:
+			motorRight()
+			motorFlag = True
 		readGps()
-		if gpsRead == True:
-			print gps.timestamp
 	#time.sleep(2)
