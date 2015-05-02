@@ -6,37 +6,41 @@ import io
 import pynmea2
 
 # Motor Pins
-MOTOR_A_1 = 7
-MOTOR_A_2 = 8
-MOTOR_B_1 = 25
-MOTOR_B_2 = 24
+MOTOR_A_1 		= 7
+MOTOR_A_2 		= 8
+MOTOR_B_1 		= 25
+MOTOR_B_2 		= 24
 
 # Sensors
-FIRE_SENSOR = 23
-OBST_SENSOR = 18
+FIRE_SENSOR 	= 23
+OBST_SENSORL 	= 18
+OBST_SENSORR 	= 11
+LOAD_OUTPUT		= 9
 
 # Delay for turing in seconds
-TURN_DELAY = 3
+TURN_DELAY 		= 3
 
 # Flags
-fire_sen_flag = 0
-obst_sen_flag = 0
+fire_sen_flag 	= 0
+obst_sen_flag 	= 0
 
 # Num and msg
-num = "9342833087"
-fireAlert = "fire detected"
+num 			= "9342833087"
+fireAlert 		= "fire detected"
 
-gps = ""
-gpsReadFlag = False
+gps 			= ""
+gpsReadFlag 	= False
 
 def setupGPIO():
 	GPIO.setmode(GPIO.BCM)
-	GPIO.setup(MOTOR_A_1, GPIO.OUT)
-	GPIO.setup(MOTOR_A_2, GPIO.OUT)
+	GPIO.setup(MOTOR_A_1, GPIO.OUT)									# Output
+	GPIO.setup(MOTOR_A_2, GPIO.OUT)							
 	GPIO.setup(MOTOR_B_1, GPIO.OUT)
 	GPIO.setup(MOTOR_B_2, GPIO.OUT)
+	GPIO.setup(LOAD_OUTPUT, GPIO.OUT)
 	GPIO.setup(FIRE_SENSOR, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-	GPIO.setup(OBST_SENSOR, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+	GPIO.setup(OBST_SENSORL, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+	GPIO.setup(OBST_SENSORR, GPIO.IN, pull_up_down = GPIO.PUD_UP)
 
 def motorFw():
 	print "Motor Forward"
@@ -112,8 +116,15 @@ def readGps():
 	except serial.SerialException:
 		print "Serial error"
 
-def readObstSen():
-	if GPIO.input(OBST_SENSOR) == 0:
+def readObstSenL():
+	if GPIO.input(OBST_SENSORL) == 0:
+		time.sleep(0.3)
+		return 1
+	else:
+		return 0
+
+def readObstSenR():
+	if GPIO.input(OBST_SENSORR) == 0:
 		time.sleep(0.3)
 		return 1
 	else:
@@ -126,30 +137,22 @@ def readFireSen():
 	else:
 		return 0
 
-motorFlag = False
-
 print "Started"
 setupGPIO()
 port = serial.Serial("/dev/ttyUSB0", baudrate = 9600, timeout = 3.0)
+
+GPIO.output(LOAD_OUTPUT, False)
 
 gpsReadFlag = False
 motorFw()
 
 while True:
-	#motorFw()
-	#time.sleep(5)
-	#motorBw()
-	#time.sleep(5)
-	#motorStop()
-	#time.sleep(5)
-	#motorRight()
-	#time.sleep(5)
-	#motorLeft()
-	#time.sleep(5)
-	fire_val = readFireSen()
-	obst_val = readObstSen()
-	#readGps()
-	#readGps()
+	motorFw()
+	
+	# read sensors
+	fire_val  = readFireSen()
+	obst_vall = readObstSenL()
+	obst_valr = readObstSenR()
 
 	# Fire sensor part
 	if fire_val == 1:
@@ -159,6 +162,7 @@ while True:
 			print "flag is 0"
 			fire_sen_flag = 1
 			motorStop()
+			GPIO.output(LOAD_OUTPUT, True)
 			print str(gpsReadFlag)
 			if gpsReadFlag == True:
 				gpsReadFlag = False
@@ -170,20 +174,19 @@ while True:
 			else:
 				print "GPS Data Not Found"
 
+	elif fire_val == 0:
+		GPIO.output(LOAD_OUTPUT, False)
+
 	else:
 		if fire_sen_flag == 1:
 			motorFw()
 			fire_sen_flag = 0
 
 	# Obstacle part
-	if obst_val == 1:
-		print "Obstacle"
-		print str(gpsReadFlag)
-		if motorFlag == True:
-			motorLeft()
-			motorFlag = False
-		else:
-			motorRight()
-			motorFlag = True
-		readGps()
-	#time.sleep(2)
+	if obst_vall == 1:
+		motorRight()
+	elif obst_valr == 1:
+		motorLeft()
+
+	# read gps
+	readGps()
