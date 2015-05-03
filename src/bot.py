@@ -38,9 +38,9 @@ def setupGPIO():
 	GPIO.setup(MOTOR_B_1, GPIO.OUT)
 	GPIO.setup(MOTOR_B_2, GPIO.OUT)
 	GPIO.setup(LOAD_OUTPUT, GPIO.OUT)
-	GPIO.setup(FIRE_SENSOR, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-	GPIO.setup(OBST_SENSORL, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-	GPIO.setup(OBST_SENSORR, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+	GPIO.setup(FIRE_SENSOR, GPIO.IN)
+	GPIO.setup(OBST_SENSORL, GPIO.IN)
+	GPIO.setup(OBST_SENSORR, GPIO.IN)
 
 def motorFw():
 	print "Motor Forward"
@@ -77,7 +77,7 @@ def motorLeft():
 	GPIO.output(MOTOR_A_2, False)
 
 def motorStop():
-	print "Motor Backward"
+	print "Motor Stop"
 	GPIO.output(MOTOR_A_1, False)
 	GPIO.output(MOTOR_A_2, False)
 	GPIO.output(MOTOR_B_1, False)
@@ -98,10 +98,7 @@ def readGps():
 	msg = ""
 	try:
 		rcv = port.readline()
-		#print rcv
 		msg = rcv.split(',')
-		#print msg
-		#port.flushInput()
 		if msg[0] == "$GPGGA":
 			try:
 				global gps
@@ -116,49 +113,27 @@ def readGps():
 	except serial.SerialException:
 		print "Serial error"
 
-def readObstSenL():
-	if GPIO.input(OBST_SENSORL) == 0:
-		time.sleep(0.3)
-		return 1
-	else:
-		return 0
-
-def readObstSenR():
-	if GPIO.input(OBST_SENSORR) == 0:
-		time.sleep(0.3)
-		return 1
-	else:
-		return 0
-
-def readFireSen():
-	if GPIO.input(FIRE_SENSOR) == 0:
-		time.sleep(0.3)
-		return 1
-	else:
-		return 0
-
 print "Started"
 setupGPIO()
 port = serial.Serial("/dev/ttyUSB0", baudrate = 9600, timeout = 3.0)
 
+# Switch of load initially
 GPIO.output(LOAD_OUTPUT, False)
 
 gpsReadFlag = False
-motorFw()
+
+_flag = False
 
 while True:
 	motorFw()
-	
-	# read sensors
-	fire_val  = readFireSen()
-	obst_vall = readObstSenL()
-	obst_valr = readObstSenR()
 
 	# Fire sensor part
-	if fire_val == 1:
+	if GPIO.input(FIRE_SENSOR) == 1:
+		time.sleep(0.3)
 		print "Fire detected"
 		print str(gpsReadFlag)
 		if fire_sen_flag == 0:
+			motorStop()
 			print "flag is 0"
 			fire_sen_flag = 1
 			motorStop()
@@ -166,26 +141,31 @@ while True:
 			print str(gpsReadFlag)
 			if gpsReadFlag == True:
 				gpsReadFlag = False
-				print "GPS Data found"
-				#sms = "Fire detected at \n" + "Lat: " + str(gps.lat) + "\n" + "Lon: " + str(gps.lon) + "\n" + "LatDir: " + str(gps.lat_dir) + "\n" + "LonDir: " + str(gps.lon_dir) + "\n" + "qua: " + str(gps.gps_qual) + "\n" + "Sat: " + str(gps.num_sats) + "\n" + "Alt: " + str(gps.altitude) + "\n" +  
+				print "GPS Data found"  
 				sms = str(gps.timestamp) + ": " + str(gps.latitude)  + str(gps.latitude_minutes) + str(gps.latitude_seconds)
 				print sms
 				sendSms(num, fireAlert)
 			else:
 				print "GPS Data Not Found"
 
-	elif fire_val == 0:
+	elif GPIO.input(FIRE_SENSOR) == 0:
+		motorFw()
+		time.sleep(0.3)
 		GPIO.output(LOAD_OUTPUT, False)
-
-	else:
-		if fire_sen_flag == 1:
-			motorFw()
-			fire_sen_flag = 0
-
-	# Obstacle part
-	if obst_vall == 1:
+		fire_sen_flag = 0	
+	if GPIO.input(OBST_SENSORL) == 1 and GPIO.input(OBST_SENSORR) == 1:
+		time.sleep(0.3)
+		if _flag == False:
+			_flag = True
+			motorRight()
+		elif _flag == True:
+			_flag = False
+			motorLeft()	
+	elif GPIO.input(OBST_SENSORL) == 1:
+		time.sleep(0.3)
 		motorRight()
-	elif obst_valr == 1:
+	elif  GPIO.input(OBST_SENSORR) == 1:
+		time.sleep(0.3)
 		motorLeft()
 
 	# read gps
