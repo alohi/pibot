@@ -5,16 +5,18 @@ import serial
 import io
 import pynmea2
 
+serialEnable = True
+
 # Motor Pins
-MOTOR_A_1 		= 7
-MOTOR_A_2 		= 8
-MOTOR_B_1 		= 25
-MOTOR_B_2 		= 24
+MOTOR_A_1 		= 8
+MOTOR_A_2 		= 7
+MOTOR_B_1 		= 24
+MOTOR_B_2 		= 25
 
 # Sensors
-FIRE_SENSOR 	= 23
+FIRE_SENSOR 	= 11
 OBST_SENSORL 	= 18
-OBST_SENSORR 	= 11
+OBST_SENSORR 	= 23
 LOAD_OUTPUT		= 9
 
 # Delay for turing in seconds
@@ -25,7 +27,7 @@ fire_sen_flag 	= 0
 obst_sen_flag 	= 0
 
 # Num and msg
-num 			= "9342833087"
+num 			= "9740613430"
 fireAlert 		= "fire detected"
 
 gps 			= ""
@@ -115,6 +117,7 @@ def readGps():
 
 print "Started"
 setupGPIO()
+#if serialEnable == True:
 port = serial.Serial("/dev/ttyUSB0", baudrate = 9600, timeout = 3.0)
 
 # Switch of load initially
@@ -124,33 +127,36 @@ gpsReadFlag = False
 
 _flag = False
 
+motorFw()
+
 while True:
-	motorFw()
+	#motorFw()
 
 	# Fire sensor part
 	if GPIO.input(FIRE_SENSOR) == 1:
 		time.sleep(0.3)
+		motorStop()
 		print "Fire detected"
 		print str(gpsReadFlag)
 		if fire_sen_flag == 0:
-			motorStop()
+			#motorStop()
 			print "flag is 0"
 			fire_sen_flag = 1
-			motorStop()
+			#motorStop()
 			GPIO.output(LOAD_OUTPUT, True)
 			print str(gpsReadFlag)
 			if gpsReadFlag == True:
 				gpsReadFlag = False
 				print "GPS Data found"  
-				sms = str(gps.timestamp) + ": " + str(gps.latitude)  + str(gps.latitude_minutes) + str(gps.latitude_seconds)
+				sms = "fire detected \n" + str(gps.timestamp) + ": " + str(gps.latitude)  + str(gps.latitude_minutes) + str(gps.latitude_seconds)
 				print sms
-				sendSms(num, fireAlert)
+				sendSms(num, sms)
 			else:
 				print "GPS Data Not Found"
 
-	elif GPIO.input(FIRE_SENSOR) == 0:
-		motorFw()
+	else:
 		time.sleep(0.3)
+		motorFw()
 		GPIO.output(LOAD_OUTPUT, False)
 		fire_sen_flag = 0	
 	if GPIO.input(OBST_SENSORL) == 1 and GPIO.input(OBST_SENSORR) == 1:
@@ -158,15 +164,20 @@ while True:
 		if _flag == False:
 			_flag = True
 			motorRight()
+			motorFw()
 		elif _flag == True:
 			_flag = False
-			motorLeft()	
+			motorLeft()
+			motorFw()	
 	elif GPIO.input(OBST_SENSORL) == 1:
 		time.sleep(0.3)
 		motorRight()
+		motorFw()
 	elif  GPIO.input(OBST_SENSORR) == 1:
 		time.sleep(0.3)
 		motorLeft()
+		motorFw()
 
 	# read gps
+	#if serialEnable == True:
 	readGps()
